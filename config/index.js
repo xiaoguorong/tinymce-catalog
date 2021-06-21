@@ -10,8 +10,14 @@ module.exports = {
     // Paths
     assetsSubDirectory: 'static',
     assetsPublicPath: '/',
-    proxyTable: {},
-
+    proxyTable: {
+        '/api': {
+                target: 'https://upplusuat.xixingjia.com',//
+                pathRewrite: {'^/api': ''}, // rewrite the paths
+                secure: false,
+                changeOrigin: true
+        }
+    },
     // Various Dev Server settings
     host: 'localhost', // can be overwritten by process.env.HOST
     port: 8080, // can be overwritten by process.env.PORT, if port is in use, a free one will be determined

@@ -1,25 +1,22 @@
 <template>
-    <div>
-        <div class="box">
-            <Catalog
-                class="catalog"
-                :container="container"
-                :catalogList.sync="catalogList"
-                :active.sync="active"
-                @updateList="updateList"
-                @clickTitle="clickTitle"
-                @editTitle="editTitle"
-                @drop="drop"
-                @rise="rise"
-                @del="del"
-                @addP="addP"
-                @addN="addN"
-                @addChild="addChild"
-                ref="catalog"
-            >
-            </Catalog>
-            <div class="demo" v-html="content"></div>
-        </div>
+    <div class="box">
+        <Catalog
+            :container="container"
+            :catalogList.sync="catalogList"
+            :active.sync="active"
+            @updateList="updateList"
+            @clickTitle="clickTitle"
+            @editTitle="editTitle"
+            @drop="drop"
+            @rise="rise"
+            @del="del"
+            @addP="addP"
+            @addN="addN"
+            @addChild="addChild"
+            ref="catalog"
+        >
+        </Catalog>
+        <div class="demo" v-html="content"></div>
     </div>
 </template>
 <script>
@@ -28,27 +25,15 @@ export default {
     components: {
         Catalog
     },
+    props: {
+        value: {
+            type: String,
+            default: ""
+        }
+    },
     data() {
         return {
-            content: `<p style="text-align:center;color:red">教案名称</p>
-                <p style="text-align:center;">学校：xxx     姓名：xxx</p>
-                    <h1>教材分析0</h1>
-                    <p>#替换这些文字为你的内容</p>
-
-                    <h1>教材分析1</h1>
-                    <p>#替换这些文字为你的内容</p>
-
-                    <h1>教材分析2</h1>
-                    <p>#替换这些文字为你的内容</p>
-
-                    <h1>教材分析3</h1>
-                    <p>#替换这些文字为你的内容</p>
-
-                    <h1>教材分析4</h1>
-                    <p>#替换这些文字为你的内容</p>
-                 <h1>教材分析5</h1>
-                    <p>#替换这些文字为你的内容</p>
-               `,
+            content: "",
             levelList: ["h1", "h2"],
             catalogList: [],
             active: "",
@@ -62,17 +47,35 @@ export default {
                 <p>#替换这些文字为你的内容</p>
             </div>`,
             oneIndex: 1,
-            twoIndex: 1
+            twoIndex: 1,
+            tinymce: ""
         };
+    },
+    watch: {
+        value(v) {
+            this.content = v;
+            this.active = "";
+            const iframe = document.querySelector("#mce_0_ifr");
+            iframe.contentWindow.scrollTo(0, 0);
+            this.tinymce.activeEditor.setContent(v)
+            this.getCatalogList();
+        }
     },
     created() {
         const that = this;
-        tinymce
+        that.content = that.value;
+        that.tinymce = tinymce;
+        that.tinymce
             .init({
                 menubar: false, // 禁用菜单栏
                 branding: false, // 隐藏右下角技术支持
                 selector: ".demo",
                 language: "zh_CN",
+                elementpath: false,//隐藏dom路径
+                statusbar: false,
+                plugins: 'preview | image',
+                toolbar: 'undo | redo | bold | italic | underline | strikethrough | alignleft | aligncenter | alignright | alignjustify | alignnone | formatselect | fontsizeselect | outdent | indent | forecolor | backcolor | image | preview',
+                fontsize_formats: "12px 14px 18px 24px 36px",
                 init_instance_callback: function (editor) {
                     editor.on("Change", function (e) {
                         that.content = e.level.content;
@@ -80,13 +83,14 @@ export default {
                     });
                     editor.on("ScrollContent", function (e) {
                         const scrollTop = e.currentTarget.scrollY;
+                        const iframe = document.querySelector("#mce_0_ifr");
                         // 到达顶部
                         if (scrollTop === 0) {
                             that.$refs.catalog.initActive();
                             return;
                         }
                         let list = that.catalogList.filter((item) => {
-                            return scrollTop >= item.offsetTop;
+                            return scrollTop >= item.offsetTop - 21;
                         });
                         if (
                             that.getIframeDom().scrollHeight - scrollTop >=
@@ -97,14 +101,28 @@ export default {
                                 : "";
                         }
                     });
+                },
+                images_upload_handler: function (blobInfo, succFun, failFun) {
+                    let file = blobInfo.blob();
+                    let formData = new FormData();
+                    formData.append('files', file, file.name )
+                    that.$axios.post('api/zuul/api/9030/file/qiNiuFileUpload', formData
+                    ).then(function (response) {
+                        console.log(response);               // get editor instance
+                       succFun(response.data.result.absoluteUrl)
+                    }).catch(function (error) {
+                        console.log(error);
+                    });
                 }
             })
             .then(() => {
-                // tinymce.activeEditor.setContent("ddddddddddd");
                 this.getCatalogList();
             });
     },
     methods: {
+        preview() {
+            this.tinymce.activeEditor.execCommand('mcePreview');
+        },
         getIframeDom() {
             const iframe = document.querySelector("#mce_0_ifr");
             const iframeDoc = iframe.contentDocument.querySelector("#tinymce");
@@ -266,7 +284,10 @@ export default {
                     ref,
                     title: item.innerText,
                     offsetTop: item.offsetTop ? item.offsetTop : 0,
-                    level: level
+                    level: level,
+                    display: true,//默认隐藏
+                    switch: false, //默认合上
+                    showMenus: false, //默认不显示操作窗口
                 });
             });
             this.catalogList = catalogList;
@@ -294,12 +315,10 @@ export default {
 }
 .box {
     display: flex;
-}
-.catalog {
-    width: 400px;
+    height: 100%;
 }
 .tox-tinymce {
     flex: 1;
-    height: 100vh !important;
+    height: 100% !important;
 }
 </style>

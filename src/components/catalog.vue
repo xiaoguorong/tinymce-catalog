@@ -1,84 +1,48 @@
 <template>
     <div class="side-catalog">
-        <div class="side-catalog__title">目录</div>
+        <div class="title">目录</div>
         <div class="side-catalog__list">
-            <div>
-                <i class="side-catalog__list-line"></i>
+            <div v-for="(item, index) in catalogList" :key="index">
                 <div
-                    v-for="(item, index) in catalogList"
-                    :key="item.ref"
+                    v-if="item.level == 1 || !item.display"
                     :style="[active === item.ref ? { color: 'blue' } : '']"
-                    class="side-catalog__list-item"
                     @click="activeAnchor(item.ref, item.title, index)"
                     @dblclick="editTitle(index)"
+                    @contextmenu.prevent.stop="rightClick(item, index)"
                     :class="{
-                        'side-catalog__list-item--active': active === item.ref
+                        'side-catalog__list-item--active': active === item.ref,
+                        'catalog__list-h1': item.level === 1,
+                        'catalog__list-h2': item.level === 2,
                     }"
                 >
-                    <!-- 每行插槽 -->
-                    <slot
-                        name="row"
-                        v-bind:level="item.level"
-                        v-bind:isActive="active === item.ref"
-                        v-bind:title="item.title"
-                    >
-                        <!-- 每行icon插槽 -->
-                        <slot
-                            name="default"
-                            v-bind:level="item.level"
-                            v-bind:isActive="active === item.ref"
-                        >
-                            <i
-                                class="side-catalog__list-item-icon"
-                                :style="
-                                    active === item.ref ? { color: 'blue' } : ''
-                                "
-                            />
-                        </slot>
-                        <span
-                            v-if="!item.canEdit"
-                            class="side-catalog__list-item-title"
-                            :class="[
-                                `side-catalog__list-item-title--level${
-                                    item.level || 1
-                                }`
-                            ]"
-                            :title="item.title"
-                            :style="[
-                                active === item.ref ? { color: 'blue' } : ''
-                            ]"
-                            >{{ item.title }}</span
-                        >
-                        &nbsp;<b
-                            v-if="item.ref.split('-')[0] == 'H2'"
-                            @click.stop="rise(index, item.title)"
-                            >升</b
-                        >&nbsp;<b
-                            v-if="item.ref.split('-')[0] == 'H1'"
-                            @click.stop="drop(index, item.title)"
-                            >降</b
-                        >&nbsp;<b @click.stop="del(index)">删</b>&nbsp;<b
-                            @click.stop="addP(index)"
-                            >前增</b
-                        >&nbsp;<b @click.stop="addN(index)">后增</b>&nbsp;<b
-                            v-if="item.ref.split('-')[0] == 'H1'"
-                            @click.stop="addChild(index)"
-                            >增子</b
-                        >
-                        <input
-                            v-model="item.title"
-                            autofocus="autofocus"
-                            v-if="item.canEdit"
-                            @blur="edit(item.ref, index, item.title)"
-                            @click.stop=""
-                        />
-                    </slot>
+                    <div class="line"></div>
+                    <img v-if="item.level === 1 && catalogList[index+1] && catalogList[index+1].level === 2" :src="item.switch ? closeIcon : openIcon" @click="shrink(item, index)">
+                    <span :style="{'margin-left': !(item.level === 1 && catalogList[index+1] && catalogList[index+1].level === 2) ? '6px' : ''}"><i v-if="item.level === 2"></i>{{ item.title }}</span>
+                    <div v-click-outside="hide">
+                        <el-popover
+                            placement="top"
+                            width="160"
+                            offset="100"
+                            :value="item.showMenus">
+                            <div class="btn-list">
+                                <p v-if="item.ref.split('-')[0] == 'H2'" @click.stop="rise(index, item.title)"><img src="@/assets/icon_shengji_rest.png"><span>升级</span></p>
+                                <p v-if="item.ref.split('-')[0] == 'H1'" @click.stop="drop(index, item.title)"><img src="@/assets/icon_jiangji_rest.png"><span>降级</span></p>
+                                <p @click.stop="del(index)"><img src="@/assets/icon_delete_rest.png"><span>删除</span></p>
+                                <p @click.stop="addP(index)"><img src="@/assets/icon_qianfang_rest.png"><span>前方新增同级目录</span></p>
+                                <p @click.stop="addN(index)"><img src="@/assets/icon_houfang_rest.png"><span>后方新增同级目录</span></p>
+                                <p v-if="item.ref.split('-')[0] == 'H1'" @click.stop="addChild(index)"><img src="@/assets/icon_zimulu_rest.png"><span>后方新增子目录</span></p>
+                            </div>
+                        </el-popover>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </template>
 <script>
+import ClickOutside from 'vue-click-outside'
+import openIcon from '@/assets/btn_zhankai.png'
+import closeIcon from '@/assets/btn_shouqi.png'
 export default {
     name: "SideCatalog",
     props: {
@@ -106,10 +70,27 @@ export default {
     },
     data() {
         return {
-            time: ""
+            time: "",
+            openIcon,
+            closeIcon,
+            visible: true
         };
     },
+    directives: {
+        ClickOutside
+    },
     methods: {
+        hide() {
+            this.catalogList.map((v, i) => {
+                this.$emit("updateList", i, "showMenus", false);
+            })
+        },
+        rightClick(item, index) {
+            this.catalogList.map((v, i) => {
+                this.$emit("updateList", i, "showMenus", false);
+            })
+            this.$emit("updateList", index, "showMenus", !item.showMenus);
+        },
         rise(index, title) {
             this.$emit("rise", index, title);
         },
@@ -149,8 +130,16 @@ export default {
             if (!this.catalogList.length) return;
             const index = last ? this.catalogList.length - 1 : 0;
             this.$emit("update:active", this.catalogList[index].ref);
+        },
+        shrink(item, index) {
+            this.$emit("updateList", index, "switch", !item.switch);
+            this.catalogList.map((v,i) => {
+                if(i > index && v.level === 2) {
+                    this.$emit("updateList", i, "display", !v.display);
+                }
+            })
         }
     }
 };
 </script>
-<style lang="css" src="./catalog.css"></style>
+<style lang="css" src="./catalog.css" scoped></style>
